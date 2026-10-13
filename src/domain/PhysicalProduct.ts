@@ -15,7 +15,7 @@ export class PhysicalProduct implements IProduct {
         this.price = data.price;
     }
 
-    calcularFreight(): number {
+    calculateFreight(): number {
         return PhysicalProduct.FREIGHT;
     }
 }

@@ -11,5 +11,5 @@ export interface IProduct {
     readonly type: string;
     readonly price: number;
 
-    calcularFreight(): number;
+    calculateFreight(): number;
 }

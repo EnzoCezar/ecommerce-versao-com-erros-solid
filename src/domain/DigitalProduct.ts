@@ -13,7 +13,7 @@ export class DigitalProduct implements IProduct {
         this.price = data.price;
     }
 
-    calcularFreight(): number {
+    calculateFreight(): number {
         return 0;
     }
 }

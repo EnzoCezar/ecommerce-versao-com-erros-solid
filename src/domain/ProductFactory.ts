@@ -1,6 +1,7 @@
 import { IProduct, ProductData } from './IProduct';
 import { PhysicalProduct } from './PhysicalProduct';
 import { DigitalProduct } from './DigitalProduct';
+import { BusinessError } from './BusinessError';
 
 type ProductBuilder = (data: ProductData) => IProduct;
 
@@ -14,7 +15,7 @@ export class ProductFactory {
         const build = this.builders[data.type];
 
         if (!build) {
-            throw new Error(`Tipo de produto não suportado: ${data.type}`);
+            throw new BusinessError(`Tipo de produto não suportado: ${data.type}`);
         }
 
         return build(data);
