@@ -13,21 +13,31 @@ Este projeto simula um backend de e-commerce com código "legado". Ele funciona,
 
 ## Instalação e Configuração
 
-Siga os passos abaixo para preparar o ambiente:
+Siga os passos abaixo (na raiz do projeto) para preparar o ambiente:
 
 1.  **Instale as dependências:**
     ```bash
     npm install
     ```
 
-2.  **Crie o banco de dados (SQLite) e as tabelas:**
+2.  **Gerar o Prisma Client:**
+    ```bash
+    npx prisma generate
+    ```
+
+3.  **Criar o banco de dados (SQLite) e as tabelas:**
     ```bash
     npm run prisma:migrate
     ```
 
-3.  **Popule o banco com dados de teste (Livro Físico e E-book):**
+4.  **Popular o banco com dados de teste :**
     ```bash
     npm run prisma:seed
+    ```
+
+5.  **(Opcional) Confirmar que o projeto compila sem erros:**
+    ```bash
+    npx tsc --noEmit
     ```
 
 ## Execução
@@ -76,6 +86,104 @@ curl -X POST http://localhost:3000/orders \
 }'
 ```
 
+### Cenário 3: Livro Físico com 2 unidades (Cartão de Crédito)
+Resultado esperado: total de R$ 210,00 (`100 × 2 + 10` de frete). A resposta traz `orderId` e `emailPreview`.
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 1, "quantity": 2 }],
+  "paymentMethod": "credit_card",
+  "paymentDetails": { "cardNumber": "4111111111111111", "cvv": "123" }
+}'
+```
+
+### Cenário 4: E-book com 2 unidades (Cartão de Débito)
+Resultado esperado: total de R$ 100,00 (`50 × 2`, sem frete).
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 2, "quantity": 2 }],
+  "paymentMethod": "debit_card",
+  "paymentDetails": {}
+}'
+```
+
+### Cenário 5: Pagamento com Pix (prova do OCP)
+Resultado esperado: sucesso, com `orderId` e `emailPreview`, sem nenhuma alteração no `OrderService`.
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 1, "quantity": 1 }],
+  "paymentMethod": "pix",
+  "paymentDetails": {}
+}'
+```
+
+### Cenário 6: Carrinho vazio
+Resultado esperado: erro 400 com `{"error":"Carrinho vazio"}`.
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [],
+  "paymentMethod": "pix",
+  "paymentDetails": {}
+}'
+```
+
+### Cenário 7: Produto inexistente
+Resultado esperado: erro 400 com `{"error":"Produto 99 não encontrado"}`.
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 99, "quantity": 1 }],
+  "paymentMethod": "pix",
+  "paymentDetails": {}
+}'
+```
+
+### Cenário 8: Método de pagamento não suportado
+Resultado esperado: erro 400 com `{"error":"Método de pagamento não suportado"}`.
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 1, "quantity": 1 }],
+  "paymentMethod": "boleto",
+  "paymentDetails": {}
+}'
+```
+
+### Cenário 9: Cartão recusado (CVV 000)
+Resultado esperado: erro 500 com `{"error":"Erro interno"}` (mesmo comportamento do código original).
+
+```bash
+curl -X POST http://localhost:3000/orders \
+-H "Content-Type: application/json" \
+-d '{
+  "customer": "teste@email.com",
+  "items": [{ "productId": 1, "quantity": 1 }],
+  "paymentMethod": "credit_card",
+  "paymentDetails": { "cardNumber": "4111111111111111", "cvv": "000" }
+}'
+```
+
 ---
 
 ## Sugestões de Melhoria
@@ -105,68 +213,40 @@ Este é o ponto mais crítico da lógica de negócio.
 
 ---
 
-## Árvore de Arquivos Sugerida (Pós-Refatoração)
-
-> **Nota:** Esta estrutura é apenas uma sugestão didática. Você tem liberdade para organizar as pastas de outra forma, desde que os princípios SOLID sejam respeitados.
-
+## Árvore de Arquivos Nova (Pós-Refatoração)
 
 ```text
 src/
-├── controllers/
-│   └── OrderController.ts        # (HTTP) Recebe request, chama OrderService, devolve response.
-├── domain/                       # (Core) Regras de Negócio Puras
-│   ├── IProduct.ts               # Interface do Produto
-│   ├── PhysicalProduct.ts        # Regra de frete físico
-│   ├── DigitalProduct.ts         # Regra de frete digital
-│   └── ProductFactory.ts         # Cria o produto correto baseada no dado do banco (veja a dica abaixo).
-├── services/                     # (Aplicação/Orquestração)
-│   ├── OrderService.ts           # Fluxo do pedido (Valida -> Paga -> Salva -> Notifica)
-│   └── NotificationService.ts    # Define O QUE enviar (Assunto, Corpo do email) - Utilize o provider de email.
-├── providers/                    # (Infraestrutura) Implementações de ferramentas externas
-│   ├── IMailProvider.ts          # Contrato (ex: sendMail)
-│   └── EtherealMailProvider.ts   # Implementação usando NODEMAILER.
-├── repositories/                 # (Camada de Dados)
-│   ├── IOrderRepository.ts       # Interface (Abstração - Não sabe que o Prisma existe)
-│   └── PrismaOrderRepository.ts  # Implementação Concreta (Usa o PrismaClient).
-├── payments/                     # (Estratégias)
-│   ├── IPaymentMethod.ts         # Contrato
-│   ├── CreditCardPayment.ts
-│   └── PixPayment.ts
-├── lib/
-│   └── logger.ts                 # Configuração do Winston
-├── app.ts
-└── server.ts
+├── controllers/                     # Camada HTTP
+│   └── OrderController.ts             # Recebe a requisição e devolve a resposta HTTP
+├── domain/                          # Regras de negócio puras
+│   ├── BusinessError.ts               # Erro de regra de negócio (vira 400)
+│   ├── IProduct.ts                    # Contrato do produto
+│   ├── PhysicalProduct.ts             # Produto físico (frete R$ 10)
+│   ├── DigitalProduct.ts              # Produto digital (sem frete)
+│   └── ProductFactory.ts              # Cria o produto certo a partir do banco
+├── services/                        # Orquestração do fluxo do pedido
+│   ├── OrderService.ts                # Fluxo do pedido: valida, paga, salva e notifica
+│   └── NotificationService.ts         # Monta o e-mail de confirmação
+├── providers/                       # Ferramentas externas (e-mail)
+│   ├── IMailProvider.ts               # Contrato de envio de e-mail
+│   └── EtherealMailProvider.ts        # Envio via Nodemailer (Ethereal)
+├── repositories/                    # Acesso ao banco de dados
+│   ├── IOrderRepository.ts            # Contrato de pedidos
+│   ├── PrismaOrderRepository.ts       # Pedidos com Prisma
+│   ├── IProductRepository.ts          # Contrato de produtos
+│   └── PrismaProductRepository.ts     # Produtos com Prisma
+├── payments/                        # Formas de pagamento
+│   ├── IPaymentMethod.ts              # Contrato de pagamento
+│   ├── CreditCardPayment.ts           # Cartão de crédito
+│   ├── DebitCardPayment.ts            # Cartão de débito
+│   ├── PixPayment.ts                  # Pix
+│   └── PaymentMethodRegistry.ts       # Escolhe o pagamento pelo nome
+├── lib/                             # Utilitários (logs)
+│   └── logger.ts                      # Configuração do Winston
+├── app.ts                             # Express e injeção de dependências
+└── server.ts                          # Inicia o servidor
 ```
-
-- *Dica Importante:* No `ProductFactory`, você pode ter um método `createProduct(data: any): Product` que verifica o tipo do produto e retorna a instância correta (`PhysicalProduct` ou `DigitalProduct`). Isso mantém o código do serviço limpo e focado na lógica de negócio. Utilize essa factory no `OrderService` para transformar os dados do banco em objetos antes de calcular o frete. Aqui você pode fazer algo como:
-
-A factory pode ser algo assim:
-
-```typescript
-// ProductFactory.ts
-import { Product } from './IProduct';
-import { PhysicalProduct } from './PhysicalProduct';
-import { DigitalProduct } from './DigitalProduct';
-export class ProductFactory {
-  static createProduct(data: any): Product {
-    if (data.type === 'physical') {
-      return new PhysicalProduct(data.id, data.name, data.price, data.weight, data.dimensions);
-    } else if (data.type === 'digital') {
-      return new DigitalProduct(data.id, data.name, data.price);
-    }
-    throw new Error('Unknown product type');
-  }
-}
-```
-
-E aqui vai um exemplo de uso dentro do OrderService:
-
-```typescript
-const product = ProductFactory.createProduct(productDataFromDB);
-const freight = product.calculateFreight();
-```
-
-O que descrevo aqui são sugestões para quem não tem idéia por onde começar. Mas se você ja tem uma idéia, sinta-se livre para implementa-la.
 
 
 
