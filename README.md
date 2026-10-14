@@ -4,10 +4,14 @@ Este projeto simula um backend de e-commerce com código "legado". Ele funciona,
 
 ## Estrutura de Diretórios
 
-* `src/controllers/OrderController.ts`: **O Problema.** Contém toda a lógica de negócio centralizada (validação, frete, pagamento, banco, notificação).
+* `src/controllers/`: Camada HTTP. O `OrderController` recebe a requisição, chama o `OrderService` e devolve a resposta.
+* `src/domain/`: Regras de negócio puras: produtos (`PhysicalProduct`, `DigitalProduct`), `ProductFactory` e `BusinessError`.
+* `src/services/`: `OrderService` (fluxo do pedido) e `NotificationService` (monta o e-mail de confirmação).
+* `src/providers/`: Ferramentas externas. `IMailProvider` e `EtherealMailProvider` (Nodemailer).
+* `src/repositories/`: Acesso ao banco. Interfaces e implementações com Prisma para pedidos e produtos.
+* `src/payments/`: Formas de pagamento (crédito, débito e Pix) e o `PaymentMethodRegistry`.
 * `src/lib/logger.ts`: Utilitário de log (Winston - procure mais sobre ele, é muito util em projetos reais).
-* `src/lib/mail.ts`: Configuração do Nodemailer (utilizando Ethereal para testes).
-* `src/app.ts` & `src/server.ts`: Configuração do Express e inicialização do servidor.
+* `src/app.ts` & `src/server.ts`: Configuração do Express, injeção de dependências e inicialização do servidor.
 * `prisma/`: Configuração do banco de dados SQLite e script de seed.
 * `prisma/seed.ts`: Popula o banco com dados iniciais.
 
